@@ -104,6 +104,12 @@ const (
 	AdditionalPropertiesPluginsEnabled = "PluginsEnabled"
 
 	// lookup key in AdditionalProperties
+	AdditionalPropertiesQGSSocketPath = "QGSSocketPath"
+
+	// lookup key in AdditionalProperties
+	AdditionalPropertiesQGSEnforced = "QGSEnforced"
+
+	// lookup key in AdditionalProperties
 	AdditionalPropertiesSynchronizationPort       = "SynchronizationPort"
 	DefaultSynchronizationPort              int32 = 9185
 
@@ -208,6 +214,18 @@ func GetTargetConfigFromKVWithEnvVarManager(kv *v1.KubeVirt, envVarManager EnvVa
 
 	if isFeatureGateEnabledInKvConfig(&kv.Spec.Configuration, featuregate.PluginsGate) {
 		additionalProperties[AdditionalPropertiesPluginsEnabled] = ""
+	}
+
+	if confidentialCompute := kv.Spec.Configuration.ConfidentialCompute; confidentialCompute != nil &&
+		confidentialCompute.TDX != nil && confidentialCompute.TDX.Attestation != nil {
+		qgsSocketPath := virtconfig.DefaultQGSSocketPath
+		if confidentialCompute.TDX.Attestation.QgsSocketPath != nil {
+			qgsSocketPath = *confidentialCompute.TDX.Attestation.QgsSocketPath
+		}
+		additionalProperties[AdditionalPropertiesQGSSocketPath] = qgsSocketPath
+		if confidentialCompute.TDX.Attestation.Enforced != nil && *confidentialCompute.TDX.Attestation.Enforced {
+			additionalProperties[AdditionalPropertiesQGSEnforced] = ""
+		}
 	}
 
 	if isFeatureGateEnabledInKvConfig(&kv.Spec.Configuration, featuregate.OptOutRoleAggregation) {
@@ -582,6 +600,15 @@ func (c *KubeVirtDeploymentConfig) OptOutRoleAggregationEnabled() bool {
 func (c *KubeVirtDeploymentConfig) PluginsEnabled() bool {
 	_, enabled := c.AdditionalProperties[AdditionalPropertiesPluginsEnabled]
 	return enabled
+}
+
+func (c *KubeVirtDeploymentConfig) GetQGSSocketPath() string {
+	return c.AdditionalProperties[AdditionalPropertiesQGSSocketPath]
+}
+
+func (c *KubeVirtDeploymentConfig) QGSEnforced() bool {
+	_, enforced := c.AdditionalProperties[AdditionalPropertiesQGSEnforced]
+	return enforced
 }
 
 func (c *KubeVirtDeploymentConfig) GetMigrationNetwork() *string {

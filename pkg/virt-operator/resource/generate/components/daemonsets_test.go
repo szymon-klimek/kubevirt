@@ -76,4 +76,81 @@ var _ = Describe("Handler DaemonSet", func() {
 		Expect(kubeletMount.MountPropagation).NotTo(BeNil())
 		Expect(*kubeletMount.MountPropagation).To(Equal(corev1.MountPropagationHostToContainer))
 	})
+
+	It("should mount the QGS socket directory when TDX attestation is configured", func() {
+		config.AdditionalProperties = map[string]string{
+			operatorutil.AdditionalPropertiesQGSSocketPath: "/var/run/tdx-qgs/custom.socket",
+		}
+
+		ds := NewHandlerDaemonSet(config, "", "", "")
+		container := ds.Spec.Template.Spec.Containers[0]
+
+		Expect(container.VolumeMounts).To(ContainElement(corev1.VolumeMount{
+			Name:      "qgs-socket",
+			MountPath: "/var/run/tdx-qgs",
+		}))
+
+		var qgsVolume *corev1.Volume
+		for i := range ds.Spec.Template.Spec.Volumes {
+			if ds.Spec.Template.Spec.Volumes[i].Name == "qgs-socket" {
+				qgsVolume = &ds.Spec.Template.Spec.Volumes[i]
+				break
+			}
+		}
+		Expect(qgsVolume).NotTo(BeNil())
+		Expect(qgsVolume.VolumeSource.HostPath.Path).To(Equal("/var/run/tdx-qgs"))
+		Expect(*qgsVolume.VolumeSource.HostPath.Type).To(Equal(corev1.HostPathDirectoryOrCreate))
+	})
+
+	It("should not mount the QGS socket when TDX attestation is absent", func() {
+		ds := NewHandlerDaemonSet(config, "", "", "")
+		container := ds.Spec.Template.Spec.Containers[0]
+
+		for _, mount := range container.VolumeMounts {
+			Expect(mount.Name).NotTo(Equal("qgs-socket"))
+		}
+		for _, volume := range ds.Spec.Template.Spec.Volumes {
+			Expect(volume.Name).NotTo(Equal("qgs-socket"))
+		}
+	})
+
+	It("should not require the QGS socket file when attestation is not enforced", func() {
+		config.AdditionalProperties = map[string]string{
+			operatorutil.AdditionalPropertiesQGSSocketPath: "/var/run/tdx-qgs/custom.socket",
+		}
+
+		ds := NewHandlerDaemonSet(config, "", "", "")
+		for i := range ds.Spec.Template.Spec.Volumes {
+			volume := ds.Spec.Template.Spec.Volumes[i]
+			if volume.Name == "qgs-socket" {
+				Expect(volume.VolumeSource.HostPath.Path).To(Equal("/var/run/tdx-qgs"))
+				Expect(*volume.VolumeSource.HostPath.Type).To(Equal(corev1.HostPathDirectoryOrCreate))
+				return
+			}
+		}
+		Fail("qgs-socket volume should exist")
+	})
+
+	It("should mount the QGS socket when TDX attestation is enforced", func() {
+		config.AdditionalProperties = map[string]string{
+			operatorutil.AdditionalPropertiesQGSSocketPath: "/var/run/tdx-qgs/custom.socket",
+			operatorutil.AdditionalPropertiesQGSEnforced:   "",
+		}
+
+		ds := NewHandlerDaemonSet(config, "", "", "")
+		var qgsVolume *corev1.Volume
+		for _, volume := range ds.Spec.Template.Spec.Volumes {
+			if volume.Name == "qgs-socket" {
+				qgsVolume = &volume
+				break
+			}
+		}
+		Expect(qgsVolume).NotTo(BeNil())
+		Expect(qgsVolume.VolumeSource.HostPath.Path).To(Equal("/var/run/tdx-qgs/custom.socket"))
+		Expect(*qgsVolume.VolumeSource.HostPath.Type).To(Equal(corev1.HostPathSocket))
+		Expect(ds.Spec.Template.Spec.Containers[0].VolumeMounts).To(ContainElement(corev1.VolumeMount{
+			Name:      "qgs-socket",
+			MountPath: "/var/run/tdx-qgs/custom.socket",
+		}))
+	})
 })

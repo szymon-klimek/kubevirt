@@ -152,6 +152,27 @@ var _ = Describe("Operator Config", func() {
 			Expect(cfgWith.ID).ToNot(Equal(cfgWithout.ID))
 		})
 
+		It("should propagate the TDX attestation QGS socket path into AdditionalProperties", func() {
+			socketPath := "/custom/tdx-qgs/qgs.socket"
+			enforced := true
+			cfg := GetTargetConfigFromKV(&v1.KubeVirt{
+				Spec: v1.KubeVirtSpec{
+					Configuration: v1.KubeVirtConfiguration{
+						ConfidentialCompute: &v1.ConfidentialComputeConfiguration{
+							TDX: &v1.TDXConfiguration{
+								Attestation: &v1.TDXAttestationConfiguration{
+									Enforced:      &enforced,
+									QgsSocketPath: &socketPath,
+								},
+							},
+						},
+					},
+				},
+			})
+
+			Expect(cfg.GetQGSSocketPath()).To(Equal(socketPath))
+		})
+
 		DescribeTable("should result in different ID when component images change", func(setImage func(*KubeVirtDeploymentConfig, string)) {
 			cfgA := &KubeVirtDeploymentConfig{}
 			cfgA.AdditionalProperties = make(map[string]string)

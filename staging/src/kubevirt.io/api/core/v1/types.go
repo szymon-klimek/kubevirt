@@ -3214,6 +3214,7 @@ type TDXAttestationConfiguration struct {
 	Enforced *bool `json:"enforced,omitempty"`
 	// Socket path pointing to the Quote Generation Service
 	// +kubebuilder:default=/var/run/tdx-qgs/qgs.socket
+	// +kubebuilder:validation:MinLength=1
 	QgsSocketPath *string `json:"qgsSocketPath,omitempty"`
 }
 

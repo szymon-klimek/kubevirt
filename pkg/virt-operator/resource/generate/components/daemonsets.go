@@ -2,6 +2,7 @@ package components
 
 import (
 	"fmt"
+	"path/filepath"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -339,6 +340,28 @@ func NewHandlerDaemonSet(config *operatorutil.KubeVirtDeploymentConfig, productN
 			VolumeSource: corev1.VolumeSource{
 				HostPath: &corev1.HostPathVolumeSource{
 					Path: volume.path,
+				},
+			},
+		})
+	}
+
+	if qgsSocketMountPoint := config.GetQGSSocketPath(); qgsSocketMountPoint != "" {
+		qgsHostPathType := corev1.HostPathDirectoryOrCreate
+		if config.QGSEnforced() {
+			qgsHostPathType = corev1.HostPathSocket
+		} else {
+			qgsSocketMountPoint = filepath.Dir(qgsSocketMountPoint)
+		}
+		container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+			Name:      "qgs-socket",
+			MountPath: qgsSocketMountPoint,
+		})
+		pod.Volumes = append(pod.Volumes, corev1.Volume{
+			Name: "qgs-socket",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: qgsSocketMountPoint,
+					Type: &qgsHostPathType,
 				},
 			},
 		})
